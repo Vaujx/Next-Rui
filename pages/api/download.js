@@ -1,5 +1,6 @@
-import ytdl from 'ytdl-core';
-import { Readable } from 'stream';
+import { YtDlp } from 'ytdlp-nodejs';
+
+const ytdlp = new YtDlp();  // Initialize globally (binary downloads on first use)
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -7,23 +8,38 @@ export default async function handler(req, res) {
   }
 
   const { url } = req.body;
-  if (!url || !ytdl.validateURL(url)) {
+  if (!url) {
     return res.status(400).json({ error: 'Invalid URL' });
   }
 
   try {
-    const info = await ytdl.getInfo(url);
-    const format = ytdl.chooseFormat(info.formats, { quality: 'highest', filter: 'audioandvideo' });
-    if (!format) {
-      throw new Error('No suitable format found');
-    }
+    // Optional: Download FFmpeg if needed (for merging formats)
+    await ytdlp.downloadFFmpeg();
 
-    const filename = `${info.videoDetails.title}.${format.container}`;
+    // Get video info to extract title for filename
+    const info = await ytdlp.getInfoAsync(url);
+    const title = info.title || 'video';
+    const filename = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.mp4`;  // Sanitize filename
+
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Type', format.mimeType);
+    res.setHeader('Content-Type', 'video/mp4');
 
-    const videoStream = ytdl.downloadFromInfo(info, { format });
+    // Stream the video (best quality with audio/video merged)
+    const videoStream = ytdlp.stream(url, {
+      format: 'bestvideo+bestaudio/best',  // Merge best video + audio
+      onProgress: (progress) => {
+        console.log('Download progress:', progress);  // Log for Vercel debugging
+      },
+    });
+
     videoStream.pipe(res);
+
+    videoStream.on('error', (error) => {
+      console.error('Stream error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: `Stream error: ${error.message}` });
+      }
+    });
   } catch (error) {
     console.error('Download error:', error);
     res.status(500).json({ error: `Error downloading video: ${error.message}` });
