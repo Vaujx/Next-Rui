@@ -5,6 +5,7 @@ export default function Home() {
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState('');
   const [previewSrc, setPreviewSrc] = useState(null);
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -13,10 +14,10 @@ export default function Home() {
 
     try {
       const response = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ url }),  // Changed to JSON
+});
 
       if (!response.ok) {
         throw new Error(await response.text());
@@ -25,6 +26,7 @@ export default function Home() {
       const blob = await response.blob();
       const filename = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'video.mp4';
       const downloadUrl = URL.createObjectURL(blob);
+      
 
       // Trigger download
       const a = document.createElement('a');
@@ -188,3 +190,4 @@ export default function Home() {
     </>
   );
 }
+
